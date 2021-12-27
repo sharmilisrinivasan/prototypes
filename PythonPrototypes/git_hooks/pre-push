@@ -1,0 +1,21 @@
+#!/bin/bash
+cd $(git rev-parse --git-dir)/..
+. git_hooks/code_metrics.config
+# -- Unit Tests and coverage--
+echo "Running Unit tests and coverage"
+nose2 -CF
+if [ $? -ne 0 ]; then
+ echo "Tests must pass before push!"
+ exit 1
+fi
+cov_val=$(coverage report -m | tail -1 | awk -F"[ %]" '{print $(NF-1)}')
+if [ -z "$cov_val" ]; then
+    echo "No coverage value obtained - passing";
+else
+    cond_val=$(echo "$cov_val < $cov_min" | bc -l)
+    if [ $cond_val -eq 1 ]; then
+        echo "Test Coverage value ($cov_val) less than threshold($cov_min)";
+        exit 1
+    fi;
+fi;
+echo "------------Completed tests and coverage------------"

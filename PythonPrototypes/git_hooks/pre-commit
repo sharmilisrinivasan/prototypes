@@ -1,0 +1,33 @@
+#!/bin/bash
+cd $(git rev-parse --git-dir)/..
+. git_hooks/code_metrics.config
+git diff --cached --name-only --diff-filter=ACM | grep ".py" | while read file
+do
+    # -- Linting --
+    echo "Processing $file for linting"
+    lint_val=$(pylint -f parseable $file | grep "Your code has been rated at" | cut -d" " -f7 | cut -d"/" -f1)
+    if [ -z "$lint_val" ]; then
+        echo "No pylint value obtained - passing";
+    else
+        cond_val=$(echo "$lint_val < $lint_threshold" | bc -l)
+        if [ $cond_val -eq 1 ]; then
+            echo "For file $file , lint value ($lint_val) less than threshold($lint_threshold)";
+            exit 1
+        fi;
+    fi;
+    echo "----"
+
+    # -- Cyclomatic complexity --
+    echo "Processing $file for CC"
+    cc_val=$(radon cc --total-average $file | grep "Average complexity:" | cut -d" " -f3)
+    if [ -z "$cc_val" ]; then
+        echo "No CC value obtained - passing";
+    else
+        if [[ $cc_val > $cc_max_rank ]]; then
+            echo "For file $file , CC rank ($cc_val) greater than threshold($cc_max_rank)";
+            exit 1
+        fi;
+    fi;
+
+    echo "------------Completed Processing $file------------"
+done
